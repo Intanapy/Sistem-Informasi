@@ -18,7 +18,7 @@ class StockEntryController extends Controller
     {
         return response()->json(
             StockEntry::with(['employee:id,name', 'variant.product', 'units:id,stock_entry_id,imei'])
-                ->latest()->paginate(20),
+                ->latest()->get(),
         );
     }
 
@@ -72,3 +72,4 @@ class StockEntryController extends Controller
         return response()->json($entry->load(['employee:id,name', 'variant.product', 'units']), 201);
     }
 }
+
