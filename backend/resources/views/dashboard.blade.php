@@ -37,6 +37,7 @@
         <span class="role">{{ auth()->user()->role }}</span>
         <h1>Dashboard operasional</h1>
         <p class="subtitle">Ringkasan hari ini di iStore.</p>
+        <section class="panel"><h2>Aplikasi iStore</h2><p>Kelola katalog produk dan stok tersimpan di database.</p><a href="{{ route('app') }}">Buka aplikasi toko →</a></section>
         <section class="cards" id="metrics"><div class="card"><span>Omzet hari ini</span><strong class="message">Memuat…</strong></div><div class="card"><span>Laba bersih hari ini</span><strong class="message">Memuat…</strong></div><div class="card"><span>Transaksi lunas</span><strong class="message">Memuat…</strong></div><div class="card"><span>Unit tersedia</span><strong class="message">Memuat…</strong></div></section>
         <section class="panel"><h2>Endpoint backend</h2><p>Semua data pada tautan berikut memerlukan login. Akses laporan dan pengelolaan produk/karyawan tertentu hanya diberikan kepada owner.</p><nav class="api-list"><a href="{{ route('api.dashboard') }}">Ringkasan dashboard (JSON)</a><a href="{{ route('api.products.index') }}">Daftar produk (JSON)</a><a href="{{ route('api.sales.index') }}">Riwayat transaksi (JSON)</a><a href="{{ route('api.stock.index') }}">Riwayat stok masuk (JSON)</a><a href="{{ route('api.cash-flows.index') }}">Arus kas (JSON)</a>@if(auth()->user()->isOwner())<a href="{{ route('api.reports') }}">Laporan laba (JSON)</a><a href="{{ route('api.employees.index') }}">Daftar karyawan (JSON)</a>@endif</nav></section>
         <section class="panel"><h2>Aturan laporan</h2><p>Laba bersih = omzet transaksi lunas − modal barang terjual − biaya operasional. Biaya pembelian stok tercatat di arus kas, sedangkan harga pokoknya mengurangi laba saat barang terjual. Harga pokok dihitung dengan rata-rata tertimbang biaya unit tersedia.</p></section>
@@ -54,3 +55,4 @@
     </script>
 </body>
 </html>
+
