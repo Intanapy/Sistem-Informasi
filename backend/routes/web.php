@@ -10,7 +10,7 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\StockEntryController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/', fn () => redirect()->route('app'));
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -21,6 +21,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 
 Route::middleware('auth')->group(function (): void {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
+    Route::view('/app', 'app')->name('app');
 
     // Endpoint JSON ini memakai session login Laravel dan perlindungan CSRF web.
     Route::prefix('api')->name('api.')->group(function (): void {
@@ -43,3 +44,4 @@ Route::middleware('auth')->group(function (): void {
         });
     });
 });
+
