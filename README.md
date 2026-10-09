@@ -1,24 +1,31 @@
-# iStore — Sistem Informasi Penjualan iPhone
+# iStore — Prototipe internal
 
-Proyek kelompok mata kuliah Sistem Informasi. Repositori ini berisi prototipe frontend dan backend Laravel untuk sistem internal toko iPhone dengan peran owner dan karyawan.
+Prototipe antarmuka sistem operasional toko iPhone untuk tugas mata kuliah Sistem Informasi.
 
-## Struktur proyek
+## Menjalankan demo
 
-- **Frontend demo:** `index.html`, `style.css`, dan `app.js`. Buka `index.html` langsung di browser; perubahan demo tersimpan di localStorage.
-- **Backend Laravel 13 + MySQL:** folder [backend](backend/README.md). Backend memiliki login berbasis session, API internal, pengelolaan peran, migrasi MySQL, seeder, stok unit dengan IMEI unik, penjualan, arus kas, dan laporan laba.
+Buka `index.html` di browser. Data demo disimpan di `localStorage` browser yang sedang dipakai. Menu Pengaturan menyediakan tombol untuk mengembalikan data demo ke kondisi awal.
 
-## Fitur prototipe frontend
+## Fitur antarmuka
 
-- Dashboard omzet, laba demo, transaksi, stok, grafik, dan metode pembayaran.
-- Katalog 40 varian contoh iPhone 14–18 reguler dan Pro Max, kapasitas 256/512 GB, warna putih/pink.
-- Pencarian berdasarkan nama/IMEI, filter model dan kapasitas, serta form transaksi, stok masuk, dan arus kas.
+- Dashboard omzet, laba, unit terjual, persediaan, grafik, dan metode pembayaran.
+- Katalog 40 varian contoh: iPhone 14–18, reguler dan Pro Max, kapasitas 256/512 GB, warna putih/pink.
+- Pencarian produk/IMEI, filter model dan kapasitas, ubah harga, modal, stok, dan deskripsi.
+- Pencatatan transaksi, stok masuk, serta arus kas pemasukan/pengeluaran.
 - Laporan omzet, modal barang terjual, biaya operasional, dan laba bersih.
-- Ekspor katalog menjadi CSV.
+- Tampilan akun/hak akses owner dan karyawan.
+- Ekspor daftar katalog sebagai CSV.
+- Data demo bertahan setelah halaman ditutup selama localStorage browser tidak dihapus.
 
-## Catatan data demo
+## Catatan data
 
-Stok, foto ilustratif, deskripsi, transaksi, dan IMEI adalah fiktif. Harga jual merupakan acuan demo, sementara modal memakai asumsi 90% dari harga jual; angka tersebut bukan harga pemasok. Warna putih/pink tidak mewakili warna resmi semua model. Jangan gunakan IMEI demo untuk perangkat sungguhan.
+Semua stok, transaksi, gambar ilustratif, deskripsi, dan IMEI merupakan data fiktif untuk presentasi. Harga jual benih memakai angka acuan yang ditemukan saat riset dan angka pendekatan untuk varian yang tidak tersedia. Harga modal awal adalah simulasi 90% dari harga jual, bukan harga pemasok. Saat sistem sebenarnya dipakai, harga modal dimasukkan dari nota penerimaan stok.
 
-## Status
+Pilihan warna putih/pink diterapkan untuk konsistensi dataset demo; kombinasi tersebut tidak mewakili pilihan warna resmi semua generasi iPhone. IMEI demo bersifat placeholder dan bukan identitas perangkat sungguhan.
 
-Backend sudah disiapkan di `backend/`, tetapi prototipe frontend di root belum dihubungkan ke endpoint backend. Ikuti panduan di [backend/README.md](backend/README.md) untuk memasang dependensi dan menyiapkan MySQL. Instalasi dependensi dan migrasi belum dijalankan di lingkungan pembuatan karena PHP di lingkungan tersebut tidak menyediakan OpenSSL.
+## Menjalankan versi backend
+
+Untuk memakai data produk dan stok yang tersimpan ke database, jalankan Laravel pada folder `backend`, lalu buka `http://127.0.0.1:8000`. Setelah login, halaman aplikasi terpadu tersedia di `/app`.
+
+Saat ini halaman produk dan stok masuk terhubung ke API Laravel. Transaksi, arus kas, laporan, dan beberapa angka dashboard masih menggunakan data demo browser. Buka [backend/README.md](backend/README.md) untuk langkah setup dan akun demo.
+
