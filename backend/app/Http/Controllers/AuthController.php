@@ -13,7 +13,7 @@ class AuthController extends Controller
     public function showLogin(): View|RedirectResponse
     {
         return Auth::check()
-            ? redirect()->route('dashboard')
+            ? redirect()->route('app')
             : view('auth.login');
     }
 
@@ -32,7 +32,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('app'));
     }
 
     public function logout(Request $request): RedirectResponse
@@ -44,3 +44,4 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 }
+
