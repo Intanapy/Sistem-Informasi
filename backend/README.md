@@ -1,6 +1,6 @@
 # Backend Laravel iStore
 
-Backend ini memakai Laravel 13 dan MySQL. Bagian `../index.html`, `../app.js`, dan `../style.css` tetap menjadi prototipe antarmuka terpisah; dashboard Laravel ini menjadi titik masuk backend dan halaman login.
+Backend ini memakai Laravel 13 dan MySQL/MariaDB. Halaman aplikasi terpadu tersedia di `/app`; halaman produk dan stok masuk membaca serta menyimpan data melalui API Laravel. Transaksi, arus kas, laporan, dan beberapa angka dashboard masih berupa data demo browser.
 
 ## Kebutuhan
 
@@ -18,14 +18,14 @@ Copy-Item .env.example .env
 php artisan key:generate
 ```
 
-Buat database MySQL bernama `istore`, sesuaikan `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` pada `.env`, lalu jalankan:
+Buat database bernama `istore`, sesuaikan `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` pada `.env`, lalu jalankan:
 
 ```powershell
 php artisan migrate --seed
 php artisan serve
 ```
 
-Buka `http://127.0.0.1:8000`. Seeder membuat akun demo:
+Buka `http://127.0.0.1:8000`. Setelah login, aplikasi terpadu terbuka di `/app`. Seeder membuat akun demo:
 
 - Owner: `owner@istore.demo` / `password`
 - Karyawan: `staff@istore.demo` / `password`
@@ -67,4 +67,5 @@ Harga jual seed merupakan data simulasi untuk presentasi, bukan daftar harga res
 
 ## Batasan saat ini
 
-Backend dan API sudah disiapkan, tetapi prototipe HTML yang berada di root belum dihubungkan ke endpoint ini. Dashboard Laravel memuat ringkasan backend; tahap berikutnya adalah mengganti pembacaan `localStorage` di prototipe dengan request API dan menyatukan tampilannya ke Blade. Instalasi dependensi/migrasi belum dijalankan di lingkungan pembuatan karena PHP yang tersedia tidak memiliki ekstensi OpenSSL.
+Katalog dan stok masuk sudah menggunakan database. Form stok meminta satu IMEI 15 digit unik untuk setiap unit. Perubahan harga jual dan pembuatan varian dibatasi untuk owner. Fitur transaksi, arus kas, laporan, dan beberapa angka dashboard masih memakai data demo browser; fitur-fitur tersebut akan disambungkan pada tahap berikutnya.
+
