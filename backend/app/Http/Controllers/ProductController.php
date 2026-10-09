@@ -7,13 +7,17 @@ use App\Models\ProductVariant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
     public function index(): JsonResponse
     {
-        $variants = ProductVariant::with('product:id,name,description,photo_path')
+        $variants = ProductVariant::with([
+            'product:id,name,description,photo_path',
+            'availableUnits:id,product_variant_id,imei,purchase_cost',
+        ])
             ->withCount(['units as stock' => fn ($query) => $query->where('status', 'in_stock')])
             ->where('is_active', true)
             ->orderBy('product_id')
@@ -43,6 +47,17 @@ class ProductController extends Controller
                 ],
             );
 
+            $variantExists = ProductVariant::where('product_id', $product->id)
+                ->where('capacity_gb', $data['capacity_gb'])
+                ->where('color', $data['color'])
+                ->exists();
+
+            if ($variantExists) {
+                throw ValidationException::withMessages([
+                    'variant' => 'Varian produk dengan kapasitas dan warna tersebut sudah ada.',
+                ]);
+            }
+
             return ProductVariant::create([
                 'product_id' => $product->id,
                 'capacity_gb' => $data['capacity_gb'],
@@ -71,3 +86,4 @@ class ProductController extends Controller
         return response()->json($variant->fresh()->load('product'));
     }
 }
+
