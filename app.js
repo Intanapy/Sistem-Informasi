@@ -1,3 +1,4 @@
+// Data awal untuk demo. Semua IMEI dan data stok di bagian ini bersifat fiktif.
 const seedProducts = () => {
   const series = [14, 15, 16, 17, 18],
     models = ["", " Pro Max"];
@@ -161,6 +162,7 @@ const seedCash = [
     type: "Pemasukan",
   },
 ];
+// Penyimpanan browser membuat perubahan demo tetap ada saat halaman dibuka lagi.
 const get = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem("istore-" + key)) ?? fallback;
@@ -188,6 +190,7 @@ function toast(text) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
 }
+// Navigasi halaman dan judul breadcrumb.
 const pageNames = {
   dashboard: "Ringkasan",
   products: "Produk",
@@ -226,6 +229,7 @@ byId("today-label").textContent = new Intl.DateTimeFormat("id-ID", {
   month: "long",
   year: "numeric",
 }).format(new Date());
+// Render tabel untuk katalog, transaksi, penerimaan stok, dan arus kas.
 function productPhoto(color) {
   return `<div class="mini-phone ${color === "Pink" ? "pink-phone" : ""}" title="Foto ilustrasi iPhone">▯</div>`;
 }
@@ -310,6 +314,7 @@ function render() {
     byId("metric-units").innerHTML = paid.length + " <small>transaksi</small>";
   }
 }
+// Form bersama untuk menambah transaksi, produk, stok, dan catatan kas.
 const backdrop = byId("modal-backdrop");
 function field(
   label,
@@ -374,6 +379,7 @@ backdrop.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeModal();
 });
+// Simpan data formulir dan perbarui persediaan/arus kas yang terkait.
 byId("modal-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const fd = new FormData(e.currentTarget),
@@ -498,6 +504,7 @@ byId("sales-search").addEventListener("input", (e) => {
     )
     .join("");
 });
+// Aksi tombol, ekspor CSV, dan reset dataset demo.
 function exportCsv() {
   let csv =
     "Produk,Varian,IMEI,Harga jual,Modal,Stok\n" +
