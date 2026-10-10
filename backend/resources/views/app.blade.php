@@ -917,7 +917,7 @@
         </form>
       </div>
     </div>
-    <script src="/istore/app.js?v=20261010-2"></script>
+    <script src="/istore/app.js?v=20261010-3"></script>
   </body>
 </html>
 
