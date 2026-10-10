@@ -28,4 +28,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(Sale::class);
     }
+
+    public function stockEntries()
+    {
+        return $this->hasMany(StockEntry::class);
+    }
+
+    public function cashFlows()
+    {
+        return $this->hasMany(CashFlow::class);
+    }
 }
+
