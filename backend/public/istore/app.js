@@ -303,6 +303,8 @@ function mapApiSale(sale) {
     id: sale.number || `TRX-${sale.id}`,
     recordId: Number(sale.id),
     userId: Number(sale.user_id),
+    createdAt: sale.created_at,
+    paidAt: sale.paid_at,
     product: product.name || "Produk",
     variant: `${variant.capacity_gb || "-"} GB · ${variant.color || "-"}`,
     imeis,
@@ -561,13 +563,25 @@ function render() {
   if (byId("metric-stock")) byId("metric-stock").innerHTML = units + " <small>unit</small>";
   if (backendMode && dashboardData) {
     if (!isOwner) {
-      byId("employee-sales-count").textContent = dashboardData.my_sales_count;
-      byId("employee-pending-count").textContent = dashboardData.my_pending_sales_count;
+      const dateKey = (value) => {
+        const date = new Date(value);
+        return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+      };
+      const today = dateKey(new Date());
+      const mySalesToday = sales.filter((sale) =>
+        sale.userId === currentUserId && sale.createdAt && dateKey(sale.createdAt) === today,
+      );
+      const myPaidSalesToday = mySalesToday.filter((sale) =>
+        sale.status === "Lunas" && dateKey(sale.paidAt || sale.createdAt) === today,
+      );
+      const myPendingSalesToday = mySalesToday.filter((sale) => sale.status !== "Lunas");
+      byId("employee-sales-count").textContent = mySalesToday.length;
+      byId("employee-pending-count").textContent = myPendingSalesToday.length;
       byId("employee-units-sold").innerHTML = `${dashboardData.units_sold} <small>unit</small>`;
       byId("employee-stock-count").innerHTML = `${dashboardData.units_in_stock} <small>unit</small>`;
-      byId("sales-count-today").textContent = `${dashboardData.my_sales_count} transaksi`;
-      byId("sales-paid-today").textContent = `${dashboardData.my_paid_sales_count} lunas`;
-      byId("sales-pending-today").textContent = `${dashboardData.my_pending_sales_count} menunggu`;
+      byId("sales-count-today").textContent = `${mySalesToday.length} transaksi`;
+      byId("sales-paid-today").textContent = `${myPaidSalesToday.length} lunas`;
+      byId("sales-pending-today").textContent = `${myPendingSalesToday.length} menunggu`;
       const myRecentSales = sales.filter((sale) => sale.userId === currentUserId).slice(0, 5);
       byId("employee-recent-sales").innerHTML = myRecentSales.map((sale) =>
         `<tr><td class="transaction-id">${escapeHtml(sale.id)}</td><td><div class="product-cell">${productPhoto(sale.variant.includes("Pink") ? "Pink" : "White")}<div><b>${escapeHtml(sale.product)}</b><small>${escapeHtml(sale.variant)}</small></div></div></td><td>${escapeHtml(sale.time)}</td><td><span class="status-pill ${sale.status === "Lunas" ? "status-paid" : "status-pending"}">${escapeHtml(sale.status)}</span></td><td><b>${rupiah(sale.total)}</b></td></tr>`,
