@@ -181,6 +181,7 @@ let products = backendMode ? [] : get("products", seedProducts()),
   dashboardData = null,
   cashSummary = null,
   reportData = null;
+let employees = [];
 const save = () => {
   if (!backendMode) {
     localStorage.setItem("istore-products", JSON.stringify(products));
@@ -360,15 +361,23 @@ async function refreshBackendData({ onlyReport = false } = {}) {
     apiRequest("sales"),
     apiRequest("cash-flows"),
     apiRequest("dashboard"),
+    ...(isOwner ? [apiRequest("employees")] : []),
     ...(isOwner ? [apiRequest(`reports?${reportQuery}`)] : []),
   ];
-  const [variantData, stockData, salesData, cashData, dashboard, report] = await Promise.all(requests);
+  const results = await Promise.all(requests);
+  const [variantData, stockData, salesData, cashData, dashboard] = results;
+  const employeeData = isOwner ? results[5] : null;
+  const report = isOwner ? results[6] : null;
   products = variantData.map(mapApiVariant);
   const stockEntries = stockData.data || stockData;
   stocks = stockEntries.map(mapApiStockEntry);
   sales = (salesData.data || salesData).map(mapApiSale);
   cash = (cashData.data || cashData).map(mapApiCashFlow);
   dashboardData = dashboard;
+  if (isOwner) {
+    employees = employeeData.data || employeeData;
+    renderEmployees();
+  }
   cashSummary = cashData.summary || null;
   if (isOwner) reportData = report;
   const unitCount = stockEntries.reduce(
@@ -398,6 +407,9 @@ const pageNames = {
   settings: "Pengaturan",
 };
 function go(page) {
+  if (backendMode && !isOwner && ["reports", "team", "settings"].includes(page)) {
+    page = "dashboard";
+  }
   document
     .querySelectorAll(".page")
     .forEach((el) => el.classList.remove("active-page"));
@@ -546,8 +558,19 @@ function render() {
   renderStock();
   renderCash();
   let units = products.reduce((sum, p) => sum + p.stock, 0);
-  byId("metric-stock").innerHTML = units + " <small>unit</small>";
+  if (byId("metric-stock")) byId("metric-stock").innerHTML = units + " <small>unit</small>";
   if (backendMode && dashboardData) {
+    if (!isOwner) {
+      byId("employee-sales-count").textContent = dashboardData.my_sales_count;
+      byId("employee-pending-count").textContent = dashboardData.my_pending_sales_count;
+      byId("employee-units-sold").innerHTML = `${dashboardData.units_sold} <small>unit</small>`;
+      byId("employee-stock-count").innerHTML = `${dashboardData.units_in_stock} <small>unit</small>`;
+      const myRecentSales = sales.filter((sale) => sale.userId === currentUserId).slice(0, 5);
+      byId("employee-recent-sales").innerHTML = myRecentSales.map((sale) =>
+        `<tr><td class="transaction-id">${escapeHtml(sale.id)}</td><td><div class="product-cell">${productPhoto(sale.variant.includes("Pink") ? "Pink" : "White")}<div><b>${escapeHtml(sale.product)}</b><small>${escapeHtml(sale.variant)}</small></div></div></td><td>${escapeHtml(sale.time)}</td><td><span class="status-pill ${sale.status === "Lunas" ? "status-paid" : "status-pending"}">${escapeHtml(sale.status)}</span></td><td><b>${rupiah(sale.total)}</b></td></tr>`,
+      ).join("") || '<tr><td colspan="5" class="muted-cell">Belum ada transaksi yang dicatat oleh akun ini.</td></tr>';
+      return;
+    }
     byId("metric-revenue").textContent = rupiah(dashboardData.revenue);
     byId("metric-profit").textContent = rupiah(dashboardData.net_profit);
     byId("metric-units").innerHTML = `${dashboardData.units_sold} <small>unit</small>`;
@@ -566,6 +589,17 @@ function render() {
     byId("metric-profit").textContent = rupiah(profit);
     byId("metric-units").innerHTML = paid.length + " <small>transaksi</small>";
   }
+}
+
+function renderEmployees() {
+  if (!isOwner || !byId("employees-table")) return;
+  byId("employee-count").textContent = `${employees.length} karyawan terdaftar`;
+  byId("employees-table").innerHTML = employees.map((employee) => {
+    const initials = employee.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+    const activityCount = Number(employee.sales_count || 0) + Number(employee.stock_entries_count || 0) + Number(employee.cash_flows_count || 0);
+    const createdAt = employee.created_at ? new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(new Date(employee.created_at)) : "—";
+    return `<tr><td><div class="product-cell"><div class="profile-avatar employee-avatar">${escapeHtml(initials)}</div><div><b>${escapeHtml(employee.name)}</b><small>Karyawan</small></div></div></td><td>${escapeHtml(employee.email)}</td><td><span class="role-pill">Karyawan</span></td><td><span class="status-pill status-paid">Aktif</span></td><td>${createdAt} · ${activityCount} aktivitas</td><td>—</td></tr>`;
+  }).join("") || '<tr><td colspan="6" class="muted-cell">Belum ada akun karyawan.</td></tr>';
 }
 // Form bersama untuk menambah transaksi, produk, stok, dan catatan kas.
 const backdrop = byId("modal-backdrop");
@@ -642,7 +676,7 @@ function openForm(kind = "sale", data = null) {
       : `<div class="form-grid">${field("Model", "model", "", "", ["iPhone 14", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro Max"])}${field("Kapasitas", "capacity", "", "", ["256 GB", "512 GB"])}${field("Warna", "color", "", "", ["White", "Pink"])}${field("Harga jual (Rp)", "price", "number", "")}${field("Harga modal/unit (Rp)", "cost", "number", "")}${field("Stok", "stock", "number", "1")}${field("IMEI demo", "imei", "text", "35824005262600041")}${field("Deskripsi", "description", "textarea", "Data demo produk iPhone iStore.")}</div>`;
   } else if (kind === "employee") {
     title = "Tambah karyawan";
-    fields = `<div class="form-grid">${field("Nama lengkap", "name", "text", "")}${field("Email", "email", "email", "")}${field("Kata sandi sementara", "password", "text", "")}${field("Peran", "role", "", "", ["Karyawan"])}</div>`;
+    fields = `<div class="form-grid">${field("Nama lengkap", "name", "text", "")}${field("Email", "email", "email", "")}${field("Kata sandi sementara", "password", "password", "")}${field("Ulangi kata sandi", "password_confirmation", "password", "")}</div>`;
   }
   byId("modal-title").textContent = title;
   byId("modal-fields").innerHTML = fields;
@@ -773,6 +807,16 @@ byId("modal-form").addEventListener("submit", async (e) => {
       toast("Catatan arus kas tersimpan ke database.");
       return;
     }
+    if (backendMode && mode === "employee") {
+      await apiRequest("employees", {
+        method: "POST",
+        body: JSON.stringify({ name: v.name, email: v.email, password: v.password, password_confirmation: v.password_confirmation }),
+      });
+      closeModal();
+      await refreshBackendData();
+      toast("Akun karyawan berhasil dibuat.");
+      return;
+    }
   } catch (error) {
     toast(error.message);
     return;
@@ -884,7 +928,7 @@ byId("quick-sale").addEventListener("click", () => openForm("sale"));
 byId("add-stock").addEventListener("click", () => openForm("stock"));
 byId("add-cash").addEventListener("click", () => openForm("cash"));
 byId("add-product").addEventListener("click", () => openForm("product"));
-byId("add-employee").addEventListener("click", () => openForm("employee"));
+byId("add-employee")?.addEventListener("click", () => openForm("employee"));
 byId("product-search").addEventListener("input", renderProducts);
 byId("model-filter").addEventListener("change", renderProducts);
 byId("capacity-filter").addEventListener("change", renderProducts);
@@ -907,8 +951,8 @@ function exportCsv() {
   URL.revokeObjectURL(a.href);
   toast("Laporan berhasil diekspor.");
 }
-byId("export-button").addEventListener("click", exportCsv);
-byId("report-export").addEventListener("click", () => {
+byId("export-button")?.addEventListener("click", exportCsv);
+byId("report-export")?.addEventListener("click", () => {
   if (backendMode && isOwner && reportData) {
     const lines = [
       "Ringkasan,Nilai",
@@ -945,13 +989,13 @@ byId("report-month")?.addEventListener("change", async () => {
     toast(error.message);
   }
 });
-byId("help-button").addEventListener("click", () =>
+byId("help-button")?.addEventListener("click", () =>
   toast("Panduan demo: pilih menu di sidebar untuk membuka fitur."),
 );
 byId("filter-button").addEventListener("click", () =>
   toast("Gunakan pilihan model dan kapasitas di samping kolom pencarian."),
 );
-byId("reset-demo").addEventListener("click", () => {
+byId("reset-demo")?.addEventListener("click", () => {
   if (backendMode) {
     toast("Produk dan stok tersimpan di database, jadi tidak bisa direset dari sini.");
     return;
