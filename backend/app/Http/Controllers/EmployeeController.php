@@ -12,9 +12,10 @@ class EmployeeController extends Controller
     public function index(): JsonResponse
     {
         $employees = User::where('role', 'employee')
+            ->select(['id', 'name', 'email', 'created_at'])
             ->withCount(['sales', 'stockEntries', 'cashFlows'])
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'created_at']);
+            ->get();
 
         return response()->json(['data' => $employees, 'total' => $employees->count()]);
     }
