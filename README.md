@@ -27,5 +27,5 @@ Pilihan warna putih/pink diterapkan untuk konsistensi dataset demo; kombinasi te
 
 Untuk memakai data produk dan stok yang tersimpan ke database, jalankan Laravel pada folder `backend`, lalu buka `http://127.0.0.1:8000`. Setelah login, halaman aplikasi terpadu tersedia di `/app`.
 
-Saat ini halaman produk dan stok masuk terhubung ke API Laravel. Transaksi, arus kas, laporan, dan beberapa angka dashboard masih menggunakan data demo browser. Buka [backend/README.md](backend/README.md) untuk langkah setup dan akun demo.
+Katalog, stok masuk, transaksi, arus kas, dan laporan tersambung ke API Laravel pada versi backend. Penjualan lunas mengurangi stok dan mencatat pemasukan; transaksi yang menunggu pembayaran dapat dikonfirmasi kemudian. Buka [backend/README.md](backend/README.md) untuk langkah setup dan akun demo.
 

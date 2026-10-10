@@ -172,18 +172,22 @@ const get = (key, fallback) => {
 };
 const backendMode =
     document.querySelector('meta[name="app-mode"]')?.content === "backend",
-  isOwner = document.querySelector('meta[name="app-role"]')?.content === "owner";
+  isOwner = document.querySelector('meta[name="app-role"]')?.content === "owner",
+  currentUserId = Number(document.querySelector('meta[name="app-user-id"]')?.content || 0);
 let products = backendMode ? [] : get("products", seedProducts()),
-  sales = get("sales", seedSales),
+  sales = backendMode ? [] : get("sales", seedSales),
   stocks = backendMode ? [] : get("stocks", seedStock),
-  cash = get("cash", seedCash);
+  cash = backendMode ? [] : get("cash", seedCash),
+  dashboardData = null,
+  cashSummary = null,
+  reportData = null;
 const save = () => {
   if (!backendMode) {
     localStorage.setItem("istore-products", JSON.stringify(products));
     localStorage.setItem("istore-stocks", JSON.stringify(stocks));
+    localStorage.setItem("istore-sales", JSON.stringify(sales));
+    localStorage.setItem("istore-cash", JSON.stringify(cash));
   }
-  localStorage.setItem("istore-sales", JSON.stringify(sales));
-  localStorage.setItem("istore-cash", JSON.stringify(cash));
 };
 const rupiah = (n) => "Rp " + Number(n || 0).toLocaleString("id-ID");
 const byId = (id) => document.getElementById(id);
@@ -271,14 +275,102 @@ function mapApiStockEntry(entry) {
   };
 }
 
-async function refreshBackendCatalog() {
-  const [variantData, stockData] = await Promise.all([
+function formatDate(value, withTime = false) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+  }).format(new Date(value));
+}
+
+function mapApiSale(sale) {
+  const items = sale.items || [];
+  const firstItem = items[0] || {};
+  const variant = firstItem.variant || {};
+  const product = variant.product || {};
+  const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const cost = items.reduce(
+    (sum, item) => sum + Number(item.average_unit_cost || 0) * Number(item.quantity || 0),
+    0,
+  );
+  const methodNames = { cash: "Tunai", transfer: "Transfer", card: "Kartu", qris: "QRIS" };
+  const imeis = items.flatMap((item) => (item.units || []).map((unit) => unit.imei));
+
+  return {
+    id: sale.number || `TRX-${sale.id}`,
+    recordId: Number(sale.id),
+    userId: Number(sale.user_id),
+    product: product.name || "Produk",
+    variant: `${variant.capacity_gb || "-"} GB · ${variant.color || "-"}`,
+    imeis,
+    employee: sale.employee?.name || "-",
+    time: formatDate(sale.paid_at || sale.created_at, true),
+    method: methodNames[sale.payment_method] || "-",
+    status: sale.status === "paid" ? "Lunas" : "Menunggu pembayaran",
+    total: Number(sale.total_amount || 0),
+    cost,
+    quantity,
+  };
+}
+
+function mapApiCashFlow(flow) {
+  const categoryNames = {
+    sale: "Penjualan",
+    stock_purchase: "Pembelian stok",
+    other_income: "Pemasukan lain",
+    operational: "Operasional",
+    rent: "Sewa",
+    utilities: "Utilitas",
+    other_expense: "Pengeluaran lain",
+  };
+  return {
+    date: formatDate(flow.created_at),
+    note: flow.description,
+    category: categoryNames[flow.category] || flow.category,
+    employee: flow.employee?.name || "-",
+    amount: Number(flow.amount || 0),
+    type: flow.type === "income" ? "Pemasukan" : "Pengeluaran",
+  };
+}
+
+function reportPeriod() {
+  const month = byId("report-month")?.value || new Date().toISOString().slice(0, 7);
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return {
+    start_date: `${month}-01`,
+    end_date: `${month}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+async function refreshBackendData({ onlyReport = false } = {}) {
+  const period = reportPeriod();
+  const reportQuery = new URLSearchParams(period).toString();
+  if (onlyReport) {
+    reportData = await apiRequest(`reports?${reportQuery}`);
+    renderReport();
+    return;
+  }
+
+  const requests = [
     apiRequest("products"),
     apiRequest("stock-entries"),
-  ]);
+    apiRequest("sales"),
+    apiRequest("cash-flows"),
+    apiRequest("dashboard"),
+    ...(isOwner ? [apiRequest(`reports?${reportQuery}`)] : []),
+  ];
+  const [variantData, stockData, salesData, cashData, dashboard, report] = await Promise.all(requests);
   products = variantData.map(mapApiVariant);
   const stockEntries = stockData.data || stockData;
   stocks = stockEntries.map(mapApiStockEntry);
+  sales = (salesData.data || salesData).map(mapApiSale);
+  cash = (cashData.data || cashData).map(mapApiCashFlow);
+  dashboardData = dashboard;
+  cashSummary = cashData.summary || null;
+  if (isOwner) reportData = report;
   const unitCount = stockEntries.reduce(
     (total, entry) => total + Number(entry.quantity || 0),
     0,
@@ -292,6 +384,7 @@ async function refreshBackendCatalog() {
   byId("stock-units-total").textContent = `${unitCount} unit masuk`;
   byId("stock-value-total").textContent = rupiah(purchaseValue);
   render();
+  if (isOwner) renderReport();
 }
 // Navigasi halaman dan judul breadcrumb.
 const pageNames = {
@@ -374,20 +467,43 @@ function renderProducts() {
   );
 }
 function renderSales() {
-  const rows = sales
+  const query = (byId("sales-search")?.value || "").toLowerCase();
+  const visibleSales = sales.filter((sale) =>
+    `${sale.id} ${sale.product} ${sale.variant} ${sale.employee}`.toLowerCase().includes(query),
+  );
+  const rows = visibleSales
     .map(
-      (s) =>
-        `<tr><td class="transaction-id">${s.id}</td><td><div class="product-cell">${productPhoto(s.variant.includes("Pink") ? "Pink" : "White")}<div><b>${s.product}</b><small>${s.variant}</small></div></div></td><td>${s.employee}</td><td>${s.time}</td><td>${s.method}</td><td><span class="status-pill ${s.status === "Lunas" ? "status-paid" : "status-pending"}">${s.status}</span></td><td><b>${rupiah(s.total)}</b></td></tr>`,
+      (s) => {
+        const imeiText = s.imeis?.length ? `<small>IMEI: ${escapeHtml(s.imeis.join(", "))}</small>` : "";
+        const mayConfirm = isOwner || s.userId === currentUserId;
+        const action = backendMode && s.status !== "Lunas" && mayConfirm
+          ? `<button class="button button-outline confirm-payment" data-sale-id="${s.recordId}">Konfirmasi bayar</button>`
+          : "—";
+        return `<tr><td class="transaction-id">${escapeHtml(s.id)}</td><td><div class="product-cell">${productPhoto(s.variant.includes("Pink") ? "Pink" : "White")}<div><b>${escapeHtml(s.product)}</b><small>${escapeHtml(s.variant)}</small>${imeiText}</div></div></td><td>${escapeHtml(s.employee)}</td><td>${escapeHtml(s.time)}</td><td>${escapeHtml(s.method)}</td><td><span class="status-pill ${s.status === "Lunas" ? "status-paid" : "status-pending"}">${escapeHtml(s.status)}</span></td><td><b>${rupiah(s.total)}</b></td><td>${action}</td></tr>`;
+      },
     )
-    .join("");
+    .join("") || '<tr><td colspan="8" class="muted-cell">Belum ada transaksi.</td></tr>';
   byId("sales-table").innerHTML = rows;
   byId("recent-sales").innerHTML = sales
     .slice(0, 4)
     .map(
       (s) =>
-        `<tr><td class="transaction-id">${s.id}</td><td><div class="product-cell">${productPhoto(s.variant.includes("Pink") ? "Pink" : "White")}<div><b>${s.product}</b><small>${s.variant}</small></div></div></td><td>${s.employee}</td><td>${s.time}</td><td><span class="status-pill ${s.status === "Lunas" ? "status-paid" : "status-pending"}">${s.status}</span></td><td><b>${rupiah(s.total)}</b></td></tr>`,
+        `<tr><td class="transaction-id">${escapeHtml(s.id)}</td><td><div class="product-cell">${productPhoto(s.variant.includes("Pink") ? "Pink" : "White")}<div><b>${escapeHtml(s.product)}</b><small>${escapeHtml(s.variant)}</small></div></div></td><td>${escapeHtml(s.employee)}</td><td>${escapeHtml(s.time)}</td><td><span class="status-pill ${s.status === "Lunas" ? "status-paid" : "status-pending"}">${escapeHtml(s.status)}</span></td><td><b>${rupiah(s.total)}</b></td></tr>`,
     )
     .join("");
+  document.querySelectorAll(".confirm-payment").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await apiRequest(`sales/${button.dataset.saleId}/confirm-payment`, { method: "POST" });
+        await refreshBackendData();
+        toast("Pembayaran dikonfirmasi, stok dan arus kas diperbarui.");
+      } catch (error) {
+        button.disabled = false;
+        toast(error.message);
+      }
+    });
+  });
 }
 function renderStock() {
   byId("stock-table").innerHTML = stocks
@@ -401,9 +517,28 @@ function renderCash() {
   byId("cash-table").innerHTML = cash
     .map(
       (c) =>
-        `<tr><td>${c.date}</td><td><b>${c.note}</b></td><td>${c.category}</td><td>${c.employee}</td><td><b>${rupiah(c.amount)}</b></td><td><span class="status-pill ${c.type === "Pemasukan" ? "status-paid" : "status-pending"}">${c.type}</span></td></tr>`,
+        `<tr><td>${escapeHtml(c.date)}</td><td><b>${escapeHtml(c.note)}</b></td><td>${escapeHtml(c.category)}</td><td>${escapeHtml(c.employee)}</td><td><b>${rupiah(c.amount)}</b></td><td><span class="status-pill ${c.type === "Pemasukan" ? "status-paid" : "status-pending"}">${escapeHtml(c.type)}</span></td></tr>`,
     )
-    .join("");
+    .join("") || '<tr><td colspan="6" class="muted-cell">Belum ada catatan arus kas.</td></tr>';
+  if (backendMode && cashSummary) {
+    byId("cash-income-total").textContent = rupiah(cashSummary.income);
+    byId("cash-expense-total").textContent = rupiah(cashSummary.expense);
+    byId("cash-balance-total").textContent = rupiah(cashSummary.income - cashSummary.expense);
+    byId("cash-entry-count").innerHTML = `${cashSummary.count} <small>catatan</small>`;
+  }
+}
+
+function renderReport() {
+  if (!backendMode || !isOwner || !reportData) return;
+  byId("report-revenue").textContent = rupiah(reportData.revenue);
+  byId("report-cogs").textContent = rupiah(reportData.cost_of_goods_sold);
+  byId("report-expenses").textContent = rupiah(reportData.operating_expenses);
+  byId("report-net-profit").textContent = rupiah(reportData.net_profit);
+  byId("report-inventory-units").textContent = reportData.units_in_stock;
+  byId("report-inventory-value").textContent = rupiah(reportData.inventory_value);
+  byId("report-products-table").innerHTML = (reportData.by_product || []).map((row) =>
+    `<tr><td><div class="product-cell">${productPhoto(row.color)}<div><b>${escapeHtml(row.product)}</b><small>${row.capacity_gb} GB · ${escapeHtml(row.color)}</small></div></div></td><td>${row.units_sold} unit</td><td>${rupiah(row.revenue)}</td><td>${rupiah(row.cost_of_goods_sold)}</td><td class="positive">${rupiah(row.gross_profit)}</td></tr>`,
+  ).join("") || '<tr><td colspan="5" class="muted-cell">Belum ada penjualan lunas pada periode ini.</td></tr>';
 }
 function render() {
   renderProducts();
@@ -412,6 +547,17 @@ function render() {
   renderCash();
   let units = products.reduce((sum, p) => sum + p.stock, 0);
   byId("metric-stock").innerHTML = units + " <small>unit</small>";
+  if (backendMode && dashboardData) {
+    byId("metric-revenue").textContent = rupiah(dashboardData.revenue);
+    byId("metric-profit").textContent = rupiah(dashboardData.net_profit);
+    byId("metric-units").innerHTML = `${dashboardData.units_sold} <small>unit</small>`;
+    byId("metric-stock").innerHTML = `${dashboardData.units_in_stock} <small>unit</small>`;
+    byId("low-stock-count").textContent = `${products.filter((product) => product.stock <= 1).length} varian`;
+    byId("sales-count-today").textContent = `${dashboardData.paid_sales_count + dashboardData.pending_sales_count} transaksi`;
+    byId("sales-paid-today").textContent = `${dashboardData.paid_sales_count} lunas`;
+    byId("sales-pending-today").textContent = `${dashboardData.pending_sales_count} menunggu`;
+    return;
+  }
   const paid = sales.filter((s) => s.status === "Lunas");
   let revenue = paid.reduce((s, t) => s + t.total, 0),
     profit = paid.reduce((s, t) => s + t.total - t.cost, 0);
@@ -433,10 +579,10 @@ function field(
   hint = "",
 ) {
   let input = options
-    ? `<select name="${name}" ${required ? "required" : ""}>${options.map((o) => `<option value="${o.value ?? o}">${o.label ?? o}</option>`).join("")}</select>`
+    ? `<select id="${name}" name="${name}" ${required ? "required" : ""}>${options.map((o) => `<option value="${o.value ?? o}">${o.label ?? o}</option>`).join("")}</select>`
     : type === "textarea"
-      ? `<textarea name="${name}" ${required ? "required" : ""}>${value}</textarea>`
-      : `<input name="${name}" type="${type}" value="${value}" ${required ? "required" : ""} ${type === "number" ? 'min="0"' : ""}>`;
+      ? `<textarea id="${name}" name="${name}" ${required ? "required" : ""}>${value}</textarea>`
+      : `<input id="${name}" name="${name}" type="${type}" value="${value}" ${required ? "required" : ""} ${type === "number" ? 'min="1"' : ""}>`;
   return `<div class="form-field"><label>${label}</label>${input}${hint ? `<small class="form-hint">${hint}</small>` : ""}</div>`;
 }
 let mode = "sale",
@@ -446,13 +592,30 @@ function openForm(kind = "sale", data = null) {
   editing = data;
   let title = "Buat transaksi",
     fields = "";
-  const productOptions = products.map((p) => ({
+  const selectableProducts = kind === "sale" && backendMode
+    ? products.filter((product) => product.stock > 0)
+    : products;
+  const productOptions = selectableProducts.map((p) => ({
     value: p.id,
     label: `${p.model} · ${p.capacity} · ${p.color === "Pink" ? "Pink" : "White"} (${p.stock} unit)`,
   }));
   if (kind === "sale") {
     title = "Buat transaksi";
-    fields = `<div class="form-grid">${field("Produk dan varian", "product", "", "", productOptions)}${field("Jumlah unit", "qty", "number", "1")} ${field("Metode pembayaran", "method", "", "", ["Tunai", "Transfer", "Kartu", "QRIS"])}${field("Status pembayaran", "status", "", "", ["Lunas", "Menunggu pembayaran"])}${field("Nama karyawan", "employee", "text", "Nadia Rahma")}${field("Catatan", "note", "text", "", null, false)}</div>`;
+    if (backendMode) {
+      const methods = [
+        { value: "cash", label: "Tunai" },
+        { value: "transfer", label: "Transfer" },
+        { value: "card", label: "Kartu" },
+        { value: "qris", label: "QRIS" },
+      ];
+      const statuses = [
+        { value: "paid", label: "Lunas" },
+        { value: "pending", label: "Menunggu pembayaran" },
+      ];
+      fields = `<div class="form-grid">${field("Produk dan varian", "product", "", "", productOptions)}${field("Jumlah unit", "qty", "number", "1")}${field("Metode pembayaran", "method", "", "", methods)}${field("Status pembayaran", "status", "", "", statuses)}<p class="form-hint">Stok berkurang dan pemasukan dicatat setelah pembayaran lunas. Transaksi menunggu pembayaran bisa dikonfirmasi dari tabel.</p>${selectableProducts.length ? "" : '<p class="form-hint">Tidak ada unit tersedia untuk dijual.</p>'}</div>`;
+    } else {
+      fields = `<div class="form-grid">${field("Produk dan varian", "product", "", "", productOptions)}${field("Jumlah unit", "qty", "number", "1")} ${field("Metode pembayaran", "method", "", "", ["Tunai", "Transfer", "Kartu", "QRIS"])}${field("Status pembayaran", "status", "", "", ["Lunas", "Menunggu pembayaran"])}${field("Nama karyawan", "employee", "text", "Nadia Rahma")}${field("Catatan", "note", "text", "", null, false)}</div>`;
+    }
   } else if (kind === "stock") {
     title = "Catat stok masuk";
     fields = backendMode
@@ -460,7 +623,13 @@ function openForm(kind = "sale", data = null) {
       : `<div class="form-grid">${field("Produk dan varian", "product", "", "", productOptions)}${field("Jumlah unit", "qty", "number", "1")}${field("Harga beli per unit", "cost", "number", "", null, true, "Masukkan harga sesuai nota pembelian pemasok.")}${field("IMEI unit pertama", "imei", "text", "35824005262600004", null, true, "IMEI demo harus unik untuk setiap unit perangkat.")}${field("Nama karyawan", "employee", "text", "Nadia Rahma")}</div>`;
   } else if (kind === "cash") {
     title = "Catat arus kas";
-    fields = `<div class="form-grid">${field("Jenis transaksi", "type", "", "", ["Pemasukan", "Pengeluaran"])}${field("Kategori", "category", "", "", ["Operasional", "Pembelian stok", "Pemasukan lain", "Biaya sewa", "Utilitas", "Lainnya"])}${field("Jumlah (Rp)", "amount", "number", "")}${field("Tanggal", "date", "date", "2026-10-09")}${field("Keterangan", "note", "text", "")}${field("Nama karyawan", "employee", "text", "Nadia Rahma")}</div>`;
+    if (backendMode) {
+      const cashTypes = [{ value: "expense", label: "Pengeluaran" }, { value: "income", label: "Pemasukan" }];
+      const categories = [{ value: "operational", label: "Operasional" }, { value: "rent", label: "Sewa" }, { value: "utilities", label: "Utilitas" }, { value: "other_expense", label: "Pengeluaran lain" }];
+      fields = `<div class="form-grid">${field("Jenis transaksi", "type", "", "", cashTypes)}${field("Kategori", "category", "", "", categories)}${field("Jumlah (Rp)", "amount", "number", "")}${field("Tanggal", "date", "date", new Date().toISOString().slice(0, 10))}${field("Keterangan", "note", "text", "")}</div>`;
+    } else {
+      fields = `<div class="form-grid">${field("Jenis transaksi", "type", "", "", ["Pemasukan", "Pengeluaran"])}${field("Kategori", "category", "", "", ["Operasional", "Pembelian stok", "Pemasukan lain", "Biaya sewa", "Utilitas", "Lainnya"])}${field("Jumlah (Rp)", "amount", "number", "")}${field("Tanggal", "date", "date", new Date().toISOString().slice(0, 10))}${field("Keterangan", "note", "text", "")}${field("Nama karyawan", "employee", "text", "Nadia Rahma")}</div>`;
+    }
   } else if (kind === "editProduct") {
     title = "Ubah data produk";
     fields = backendMode
@@ -477,7 +646,31 @@ function openForm(kind = "sale", data = null) {
   }
   byId("modal-title").textContent = title;
   byId("modal-fields").innerHTML = fields;
+  byId("save-modal").disabled = backendMode && kind === "sale" && selectableProducts.length === 0;
   backdrop.classList.add("open");
+  if (backendMode && kind === "sale") {
+    const productSelect = byId("product");
+    const quantityInput = byId("qty");
+    const updateQuantityLimit = () => {
+      const chosen = products.find((product) => product.id === Number(productSelect.value));
+      quantityInput.max = chosen?.stock || 1;
+      if (Number(quantityInput.value) > Number(quantityInput.max)) quantityInput.value = quantityInput.max;
+    };
+    productSelect?.addEventListener("change", updateQuantityLimit);
+    updateQuantityLimit();
+  }
+  if (backendMode && kind === "cash") {
+    const typeSelect = byId("type");
+    const categorySelect = byId("category");
+    const updateCashCategories = () => {
+      const choices = typeSelect.value === "income"
+        ? [{ value: "other_income", label: "Pemasukan lain" }]
+        : [{ value: "operational", label: "Operasional" }, { value: "rent", label: "Sewa" }, { value: "utilities", label: "Utilitas" }, { value: "other_expense", label: "Pengeluaran lain" }];
+      categorySelect.innerHTML = choices.map((choice) => `<option value="${choice.value}">${choice.label}</option>`).join("");
+    };
+    typeSelect?.addEventListener("change", updateCashCategories);
+    updateCashCategories();
+  }
   setTimeout(() => backdrop.querySelector("input,select")?.focus(), 30);
 }
 function closeModal() {
@@ -545,6 +738,39 @@ byId("modal-form").addEventListener("submit", async (e) => {
       closeModal();
       await refreshBackendCatalog();
       toast("Produk berhasil diperbarui.");
+      return;
+    }
+    if (backendMode && mode === "sale") {
+      await apiRequest("sales", {
+        method: "POST",
+        body: JSON.stringify({
+          product_variant_id: Number(v.product),
+          quantity: Number(v.qty),
+          payment_method: v.method,
+          status: v.status,
+        }),
+      });
+      closeModal();
+      await refreshBackendData();
+      toast(v.status === "paid"
+        ? "Transaksi tersimpan. Stok dan arus kas sudah diperbarui."
+        : "Transaksi tersimpan dengan status menunggu pembayaran.");
+      return;
+    }
+    if (backendMode && mode === "cash") {
+      await apiRequest("cash-flows", {
+        method: "POST",
+        body: JSON.stringify({
+          type: v.type,
+          category: v.category,
+          amount: Number(v.amount),
+          date: v.date,
+          description: v.note,
+        }),
+      });
+      closeModal();
+      await refreshBackendData();
+      toast("Catatan arus kas tersimpan ke database.");
       return;
     }
   } catch (error) {
@@ -662,16 +888,7 @@ byId("add-employee").addEventListener("click", () => openForm("employee"));
 byId("product-search").addEventListener("input", renderProducts);
 byId("model-filter").addEventListener("change", renderProducts);
 byId("capacity-filter").addEventListener("change", renderProducts);
-byId("sales-search").addEventListener("input", (e) => {
-  const q = e.target.value.toLowerCase();
-  byId("sales-table").innerHTML = sales
-    .filter((s) => (s.id + s.product + s.variant).toLowerCase().includes(q))
-    .map(
-      (s) =>
-        `<tr><td class="transaction-id">${s.id}</td><td><b>${s.product}</b><br><small>${s.variant}</small></td><td>${s.employee}</td><td>${s.time}</td><td>${s.method}</td><td><span class="status-pill ${s.status === "Lunas" ? "status-paid" : "status-pending"}">${s.status}</span></td><td><b>${rupiah(s.total)}</b></td></tr>`,
-    )
-    .join("");
-});
+byId("sales-search").addEventListener("input", renderSales);
 // Aksi tombol, ekspor CSV, dan reset dataset demo.
 function exportCsv() {
   let csv =
@@ -691,7 +908,43 @@ function exportCsv() {
   toast("Laporan berhasil diekspor.");
 }
 byId("export-button").addEventListener("click", exportCsv);
-byId("report-export").addEventListener("click", exportCsv);
+byId("report-export").addEventListener("click", () => {
+  if (backendMode && isOwner && reportData) {
+    const lines = [
+      "Ringkasan,Nilai",
+      `Omzet,${reportData.revenue}`,
+      `Modal barang terjual,${reportData.cost_of_goods_sold}`,
+      `Biaya operasional,${reportData.operating_expenses}`,
+      `Laba bersih,${reportData.net_profit}`,
+      "",
+      "Produk,Varian,Unit terjual,Omzet,Modal,Laba kotor",
+      ...(reportData.by_product || []).map((row) => [
+        row.product,
+        `${row.capacity_gb} GB ${row.color}`,
+        row.units_sold,
+        row.revenue,
+        row.cost_of_goods_sold,
+        row.gross_profit,
+      ].join(",")),
+    ];
+    const anchor = document.createElement("a");
+    anchor.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    anchor.download = "laporan-istore.csv";
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+    toast("Laporan database berhasil diekspor.");
+    return;
+  }
+  exportCsv();
+});
+byId("report-month")?.addEventListener("change", async () => {
+  if (!backendMode || !isOwner) return;
+  try {
+    await refreshBackendData({ onlyReport: true });
+  } catch (error) {
+    toast(error.message);
+  }
+});
 byId("help-button").addEventListener("click", () =>
   toast("Panduan demo: pilih menu di sidebar untuk membuka fitur."),
 );
@@ -716,14 +969,15 @@ byId("reset-demo").addEventListener("click", () => {
 });
 if (backendMode) {
   if (!isOwner) byId("add-product").hidden = true;
-  refreshBackendCatalog()
+  if (!isOwner) byId('nav-item-reports')?.remove();
+  refreshBackendData()
     .then(() => {
       const initial = location.hash.slice(1);
       if (pageNames[initial]) go(initial);
     })
     .catch((error) => {
       render();
-      toast(`Gagal memuat produk/stok: ${error.message}`);
+      toast(`Gagal memuat data toko: ${error.message}`);
     });
 } else {
   render();

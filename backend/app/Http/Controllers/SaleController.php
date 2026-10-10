@@ -17,9 +17,11 @@ class SaleController extends Controller
 {
     public function index(): JsonResponse
     {
-        $sales = Sale::with(['employee:id,name', 'items.variant.product'])
-            ->latest()
-            ->paginate(20);
+        $sales = Sale::with([
+            'employee:id,name',
+            'items.variant.product',
+            'items.units:id,sale_item_id,imei',
+        ])->latest()->get();
 
         return response()->json($sales);
     }
@@ -61,7 +63,11 @@ class SaleController extends Controller
             return $sale;
         });
 
-        return response()->json($sale->load(['employee:id,name', 'items.variant.product']), 201);
+        return response()->json($sale->load([
+            'employee:id,name',
+            'items.variant.product',
+            'items.units:id,sale_item_id,imei',
+        ]), 201);
     }
 
     public function confirmPayment(Request $request, Sale $sale): JsonResponse
@@ -82,7 +88,11 @@ class SaleController extends Controller
             $sale->update(['status' => 'paid', 'paid_at' => now()]);
         });
 
-        return response()->json($sale->fresh()->load(['employee:id,name', 'items.variant.product']));
+        return response()->json($sale->fresh()->load([
+            'employee:id,name',
+            'items.variant.product',
+            'items.units:id,sale_item_id,imei',
+        ]));
     }
 
     private function deductInventoryAndRecordIncome(Sale $sale, SaleItem $item): void
@@ -123,3 +133,4 @@ class SaleController extends Controller
         );
     }
 }
+

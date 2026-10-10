@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <meta name="app-mode" content="backend" />
     <meta name="app-role" content="{{ auth()->user()->role }}" />
+    <meta name="app-user-id" content="{{ auth()->id() }}" />
     <title>iStore — Sistem Operasional Toko</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/istore/style.css" />
+    <link rel="stylesheet" href="/istore/style.css?v=20261010-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -49,9 +50,11 @@
           <button class="nav-item" data-page="cashflow">
             <span class="nav-icon">◷</span>Arus kas
           </button>
-          <button class="nav-item" data-page="reports">
-            <span class="nav-icon">▤</span>Laporan
-          </button>
+          @if (auth()->user()->isOwner())
+            <button class="nav-item" data-page="reports">
+              <span class="nav-icon">▤</span>Laporan
+            </button>
+          @endif
         </nav>
         <div class="nav-label management-label">PENGELOLAAN</div>
         <nav class="main-nav">
@@ -97,7 +100,7 @@
           </div>
         </header>
         <div class="page-wrap">
-          <div class="sync-notice"><b>Katalog terhubung:</b> perubahan produk dan stok masuk disimpan ke database. Fitur transaksi, arus kas, dan laporan masih berupa data demo.</div>
+          <div class="sync-notice"><b>Data tersimpan:</b> produk, stok, transaksi, arus kas, dan laporan membaca database iStore.</div>
           <section class="page active-page" id="page-dashboard">
             <div class="page-heading">
               <div>
@@ -133,11 +136,10 @@
                   ><span class="metric-icon violet">↗</span>
                 </div>
                 <div class="metric-value" id="metric-revenue">
-                  Rp 42.850.000
+                  Rp 0
                 </div>
                 <div class="metric-foot">
-                  <span class="trend up">↑ 12,8%</span
-                  ><span> dibanding periode lalu</span>
+                  <span id="metric-revenue-foot">Transaksi lunas hari ini</span>
                 </div>
                 <div class="sparkline spark-purple">
                   <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
@@ -149,10 +151,9 @@
                   <span>Laba bersih</span
                   ><span class="metric-icon green">↗</span>
                 </div>
-                <div class="metric-value" id="metric-profit">Rp 5.420.000</div>
+                <div class="metric-value" id="metric-profit">Rp 0</div>
                 <div class="metric-foot">
-                  <span class="trend up">↑ 8,2%</span
-                  ><span> dibanding periode lalu</span>
+                  <span id="metric-profit-foot">Setelah modal dan biaya operasional</span>
                 </div>
                 <div class="sparkline spark-green">
                   <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
@@ -165,11 +166,10 @@
                   ><span class="metric-icon blue">▣</span>
                 </div>
                 <div class="metric-value" id="metric-units">
-                  12 <small>unit</small>
+                  0 <small>unit</small>
                 </div>
                 <div class="metric-foot">
-                  <span class="trend up">↑ 4 unit</span
-                  ><span> dibanding periode lalu</span>
+                  <span id="metric-units-foot">Unit terjual hari ini</span>
                 </div>
                 <div class="sparkline spark-blue">
                   <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
@@ -182,10 +182,10 @@
                   ><span class="metric-icon amber">▤</span>
                 </div>
                 <div class="metric-value" id="metric-stock">
-                  68 <small>unit</small>
+                  0 <small>unit</small>
                 </div>
                 <div class="metric-foot">
-                  <span class="stock-note"><b>6 produk</b> stok menipis</span
+                  <span class="stock-note"><b id="low-stock-count">0 varian</b> stok menipis</span
                   ><a href="#products" data-goto="products">Lihat stok →</a>
                 </div>
                 <div class="stock-bars">
@@ -440,16 +440,16 @@
             <div class="product-summary sales-summary">
               <div>
                 <span class="summary-icon">↗</span
-                ><span><b>12 transaksi</b><small>Hari ini</small></span>
+                ><span><b id="sales-count-today">0 transaksi</b><small>Hari ini</small></span>
               </div>
               <div>
                 <span class="summary-icon green-icon">✓</span
-                ><span><b>10 lunas</b><small>Pembayaran selesai</small></span>
+                ><span><b id="sales-paid-today">0 lunas</b><small>Pembayaran selesai</small></span>
               </div>
               <div>
                 <span class="summary-icon orange-icon">◷</span
                 ><span
-                  ><b>2 menunggu</b><small>Menunggu pembayaran</small></span
+                  ><b id="sales-pending-today">0 menunggu</b><small>Menunggu pembayaran</small></span
                 >
               </div>
             </div>
@@ -485,6 +485,7 @@
                       <th>METODE</th>
                       <th>STATUS</th>
                       <th>TOTAL</th>
+                      <th>AKSI</th>
                     </tr>
                   </thead>
                   <tbody id="sales-table"></tbody>
@@ -562,14 +563,14 @@
                 <div class="metric-head">
                   Total pemasukan <span class="metric-icon green">↓</span>
                 </div>
-                <div class="metric-value">Rp 52.750.000</div>
-                <div class="metric-foot">Periode Oktober 2026</div>
+                <div class="metric-value" id="cash-income-total">Rp 0</div>
+                <div class="metric-foot">Pemasukan bulan ini</div>
               </article>
               <article class="metric-card">
                 <div class="metric-head">
                   Total pengeluaran <span class="metric-icon coral">↑</span>
                 </div>
-                <div class="metric-value">Rp 38.200.000</div>
+                <div class="metric-value" id="cash-expense-total">Rp 0</div>
                 <div class="metric-foot">
                   Termasuk pembelian stok & operasional
                 </div>
@@ -578,15 +579,15 @@
                 <div class="metric-head">
                   Saldo kas bersih <span class="metric-icon blue">◈</span>
                 </div>
-                <div class="metric-value">Rp 14.550.000</div>
+                <div class="metric-value" id="cash-balance-total">Rp 0</div>
                 <div class="metric-foot">Pemasukan dikurangi pengeluaran</div>
               </article>
               <article class="metric-card">
                 <div class="metric-head">
                   Transaksi kas <span class="metric-icon violet">≡</span>
                 </div>
-                <div class="metric-value">26 <small>catatan</small></div>
-                <div class="metric-foot">Periode Oktober 2026</div>
+                <div class="metric-value" id="cash-entry-count">0 <small>catatan</small></div>
+                <div class="metric-foot">Catatan kas bulan ini</div>
               </article>
             </div>
             <div class="panel table-panel">
@@ -637,36 +638,41 @@
             <div class="filter-row">
               <div class="date-filter">
                 ▦
-                <select>
-                  <option>Oktober 2026</option>
-                  <option>September 2026</option></select
-                ><span class="down">⌄</span>
+                <input type="month" id="report-month" value="{{ now()->format('Y-m') }}" aria-label="Bulan laporan" />
               </div>
             </div>
             <div class="metric-grid report-metrics">
               <article class="metric-card">
                 <div class="metric-head">Omzet</div>
-                <div class="metric-value">Rp 286.450.000</div>
-                <div class="metric-foot">
-                  <span class="trend up">↑ 14,2%</span> dari bulan lalu
-                </div>
+                <div class="metric-value" id="report-revenue">Rp 0</div>
+                <div class="metric-foot">Omzet transaksi lunas</div>
               </article>
               <article class="metric-card">
                 <div class="metric-head">Modal barang terjual</div>
-                <div class="metric-value">Rp 251.730.000</div>
+                <div class="metric-value" id="report-cogs">Rp 0</div>
                 <div class="metric-foot">
                   Berdasarkan harga modal saat stok masuk
                 </div>
               </article>
               <article class="metric-card">
                 <div class="metric-head">Biaya operasional</div>
-                <div class="metric-value">Rp 12.800.000</div>
+                <div class="metric-value" id="report-expenses">Rp 0</div>
                 <div class="metric-foot">Di luar pembelian stok</div>
               </article>
               <article class="metric-card">
                 <div class="metric-head">Laba bersih</div>
-                <div class="metric-value">Rp 21.920.000</div>
+                <div class="metric-value" id="report-net-profit">Rp 0</div>
                 <div class="metric-foot">Omzet − modal terjual − biaya</div>
+              </article>
+              <article class="metric-card">
+                <div class="metric-head">Unit tersedia</div>
+                <div class="metric-value" id="report-inventory-units">0</div>
+                <div class="metric-foot">Stok yang masih ada</div>
+              </article>
+              <article class="metric-card">
+                <div class="metric-head">Nilai persediaan</div>
+                <div class="metric-value" id="report-inventory-value">Rp 0</div>
+                <div class="metric-foot">Berdasarkan harga beli</div>
               </article>
             </div>
             <div class="panel report-note">
@@ -685,7 +691,7 @@
               <div class="panel-heading table-title">
                 <div>
                   <h2>Ringkasan produk terjual</h2>
-                  <p>Produk terlaris selama Oktober</p>
+                  <p>Ringkasan berdasarkan periode yang dipilih</p>
                 </div>
               </div>
               <div class="table-scroll">
@@ -699,37 +705,7 @@
                       <th>LABA KOTOR</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <div class="product-cell">
-                          <div class="mini-phone">▯</div>
-                          <div>
-                            <b>iPhone 17 Pro Max</b
-                            ><small>512 GB · White</small>
-                          </div>
-                        </div>
-                      </td>
-                      <td>8 unit</td>
-                      <td>Rp 235.992.000</td>
-                      <td>Rp 213.400.000</td>
-                      <td class="positive">Rp 22.592.000</td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="product-cell">
-                          <div class="mini-phone pink-phone">▯</div>
-                          <div>
-                            <b>iPhone 16</b><small>256 GB · Pink</small>
-                          </div>
-                        </div>
-                      </td>
-                      <td>6 unit</td>
-                      <td>Rp 98.994.000</td>
-                      <td>Rp 89.100.000</td>
-                      <td class="positive">Rp 9.894.000</td>
-                    </tr>
-                  </tbody>
+                  <tbody id="report-products-table"></tbody>
                 </table>
               </div>
             </div>
@@ -931,7 +907,7 @@
         </form>
       </div>
     </div>
-    <script src="/istore/app.js"></script>
+    <script src="/istore/app.js?v=20261010-1"></script>
   </body>
 </html>
 

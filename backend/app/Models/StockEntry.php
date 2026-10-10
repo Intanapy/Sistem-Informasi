@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class StockEntry extends Model
 {
     protected $fillable = [
-        'user_id', 'product_variant_id', 'quantity', 'unit_cost', 'total_cost', 'note',
+        'number', 'user_id', 'product_variant_id', 'quantity', 'unit_cost', 'total_cost', 'note',
     ];
 
     protected function casts(): array
@@ -32,3 +32,4 @@ class StockEntry extends Model
         return $this->hasMany(InventoryUnit::class);
     }
 }
+

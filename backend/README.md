@@ -1,6 +1,6 @@
 # Backend Laravel iStore
 
-Backend ini memakai Laravel 13 dan MySQL/MariaDB. Halaman aplikasi terpadu tersedia di `/app`; halaman produk dan stok masuk membaca serta menyimpan data melalui API Laravel. Transaksi, arus kas, laporan, dan beberapa angka dashboard masih berupa data demo browser.
+Backend ini memakai Laravel 13 dan MySQL/MariaDB. Halaman aplikasi terpadu tersedia di `/app`; katalog, stok, transaksi, arus kas, dan laporan membaca serta menyimpan data melalui API Laravel.
 
 ## Kebutuhan
 
@@ -59,7 +59,7 @@ Semua endpoint menggunakan session login Laravel. Request POST/PATCH dari browse
 
 Migrasi menyimpan produk, varian, unit stok individual, IMEI unik, transaksi, penerimaan stok, dan arus kas. IMEI seed adalah angka fiktif. Saat stok dicatat, masukkan satu IMEI berbeda untuk setiap unit.
 
-Transaksi `pending` belum mengurangi stok atau menambah omzet. Saat pembayaran dikonfirmasi, backend mengunci dan mengambil unit stok, mencatat harga modal rata-rata tertimbang, lalu membuat pemasukan arus kas satu kali. Pembelian stok adalah pengeluaran kas tetapi tidak langsung mengurangi laba; HPP mengurangi laba ketika unit terjual.
+Transaksi `pending` belum mengurangi stok atau menambah omzet. Saat pembayaran dikonfirmasi, backend mengunci dan mengambil unit stok, mencatat harga modal rata-rata tertimbang, lalu membuat pemasukan arus kas satu kali. Transaksi menunggu pembayaran dapat dikonfirmasi melalui tabel transaksi oleh karyawan pencatat atau owner. Pembelian stok adalah pengeluaran kas tetapi tidak langsung mengurangi laba; HPP mengurangi laba ketika unit terjual.
 
 ## Catatan harga
 
@@ -67,5 +67,5 @@ Harga jual seed merupakan data simulasi untuk presentasi, bukan daftar harga res
 
 ## Batasan saat ini
 
-Katalog dan stok masuk sudah menggunakan database. Form stok meminta satu IMEI 15 digit unik untuk setiap unit. Perubahan harga jual dan pembuatan varian dibatasi untuk owner. Fitur transaksi, arus kas, laporan, dan beberapa angka dashboard masih memakai data demo browser; fitur-fitur tersebut akan disambungkan pada tahap berikutnya.
+Form stok meminta satu IMEI 15 digit unik untuk setiap unit. Perubahan harga jual dan pembuatan varian dibatasi untuk owner. Transaksi lunas mengurangi stok, menambahkan pemasukan, dan menjadi dasar laporan laba; transaksi pending menunggu konfirmasi pembayaran. Arus kas manual menerima pemasukan lain dan biaya operasional, sewa, utilitas, atau pengeluaran lain. Laporan menampilkan omzet, HPP, biaya operasional, laba bersih, persediaan, dan ringkasan produk terjual berdasarkan bulan yang dipilih.
 
