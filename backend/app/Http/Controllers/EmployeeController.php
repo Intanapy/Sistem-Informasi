@@ -11,7 +11,12 @@ class EmployeeController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(User::where('role', 'employee')->orderBy('name')->get(['id', 'name', 'email', 'created_at']));
+        $employees = User::where('role', 'employee')
+            ->withCount(['sales', 'stockEntries', 'cashFlows'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'created_at']);
+
+        return response()->json(['data' => $employees, 'total' => $employees->count()]);
     }
 
     public function store(Request $request): JsonResponse
@@ -32,3 +37,4 @@ class EmployeeController extends Controller
         return response()->json($employee->only(['id', 'name', 'email', 'role']), 201);
     }
 }
+
