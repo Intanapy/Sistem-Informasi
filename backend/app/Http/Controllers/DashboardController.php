@@ -24,7 +24,8 @@ class DashboardController extends Controller
                 'role' => 'employee',
                 'date' => $start->toDateString(),
                 'my_sales_count' => (clone $mySales)->whereBetween('created_at', [$start, $end])->count(),
-                'my_pending_sales_count' => (clone $mySales)->where('status', 'pending')->count(),
+                'my_paid_sales_count' => (clone $mySales)->where('status', 'paid')->whereBetween('paid_at', [$start, $end])->count(),
+                'my_pending_sales_count' => (clone $mySales)->where('status', 'pending')->whereBetween('created_at', [$start, $end])->count(),
                 'units_sold' => SaleItem::whereHas('sale', fn ($query) => $query
                     ->where('user_id', $request->user()->id)
                     ->where('status', 'paid')
