@@ -34,7 +34,8 @@ Ganti kata sandi demo sebelum sistem digunakan di luar presentasi.
 
 ## Peran
 
-- Owner dapat mengelola produk/harga, melihat laporan, dan membuat akun karyawan.
+- Owner mendapat dashboard omzet/laba, dapat mengelola produk/harga, membuka laporan, dan membuat akun karyawan.
+- Karyawan mendapat dashboard operasional tanpa ringkasan laba, serta dapat mencatat stok, transaksi, dan arus kas.
 - Karyawan dapat melihat produk, mencatat penjualan, stok masuk, serta arus kas.
 - Semua halaman dan endpoint JSON internal memerlukan sesi login. Pendaftaran publik tidak disediakan.
 
@@ -53,7 +54,7 @@ Semua endpoint menggunakan session login Laravel. Request POST/PATCH dari browse
 | GET, POST | `/api/stock-entries` | Owner dan karyawan |
 | GET, POST | `/api/cash-flows` | Owner dan karyawan |
 | GET | `/api/reports` | Owner |
-| GET, POST | `/api/employees` | Owner |
+| GET, POST | `/api/employees` | Owner; daftar akun karyawan dan membuat akun dengan konfirmasi kata sandi |
 
 ## Data dan perhitungan
 
