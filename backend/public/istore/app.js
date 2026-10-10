@@ -565,6 +565,9 @@ function render() {
       byId("employee-pending-count").textContent = dashboardData.my_pending_sales_count;
       byId("employee-units-sold").innerHTML = `${dashboardData.units_sold} <small>unit</small>`;
       byId("employee-stock-count").innerHTML = `${dashboardData.units_in_stock} <small>unit</small>`;
+      byId("sales-count-today").textContent = `${dashboardData.my_sales_count} transaksi`;
+      byId("sales-paid-today").textContent = `${dashboardData.my_paid_sales_count} lunas`;
+      byId("sales-pending-today").textContent = `${dashboardData.my_pending_sales_count} menunggu`;
       const myRecentSales = sales.filter((sale) => sale.userId === currentUserId).slice(0, 5);
       byId("employee-recent-sales").innerHTML = myRecentSales.map((sale) =>
         `<tr><td class="transaction-id">${escapeHtml(sale.id)}</td><td><div class="product-cell">${productPhoto(sale.variant.includes("Pink") ? "Pink" : "White")}<div><b>${escapeHtml(sale.product)}</b><small>${escapeHtml(sale.variant)}</small></div></div></td><td>${escapeHtml(sale.time)}</td><td><span class="status-pill ${sale.status === "Lunas" ? "status-paid" : "status-pending"}">${escapeHtml(sale.status)}</span></td><td><b>${rupiah(sale.total)}</b></td></tr>`,
@@ -741,7 +744,7 @@ byId("modal-form").addEventListener("submit", async (e) => {
         }),
       });
       closeModal();
-      await refreshBackendCatalog();
+      await refreshBackendData();
       toast("Stok masuk berhasil disimpan ke database.");
       return;
     }
@@ -757,7 +760,7 @@ byId("modal-form").addEventListener("submit", async (e) => {
         }),
       });
       closeModal();
-      await refreshBackendCatalog();
+      await refreshBackendData();
       toast("Varian produk tersimpan. Catat unitnya melalui menu Stok masuk.");
       return;
     }
@@ -770,7 +773,7 @@ byId("modal-form").addEventListener("submit", async (e) => {
         }),
       });
       closeModal();
-      await refreshBackendCatalog();
+      await refreshBackendData();
       toast("Produk berhasil diperbarui.");
       return;
     }
