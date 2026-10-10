@@ -56,14 +56,16 @@
             </button>
           @endif
         </nav>
-        <div class="nav-label management-label">PENGELOLAAN</div>
-        <nav class="main-nav">
-          <button class="nav-item" data-page="team">
-            <span class="nav-icon">♙</span>Akun karyawan</button
-          ><button class="nav-item" data-page="settings">
-            <span class="nav-icon">⚙</span>Pengaturan
-          </button>
-        </nav>
+        @if (auth()->user()->isOwner())
+          <div class="nav-label management-label">PENGELOLAAN</div>
+          <nav class="main-nav">
+            <button class="nav-item" data-page="team">
+              <span class="nav-icon">♙</span>Akun karyawan</button
+            ><button class="nav-item" data-page="settings">
+              <span class="nav-icon">⚙</span>Pengaturan
+            </button>
+          </nav>
+        @endif
         <div class="sidebar-bottom">
           <div class="help-card">
             <span class="help-symbol">?</span><b>Butuh bantuan?</b>
@@ -71,7 +73,7 @@
             <button id="help-button">Buka panduan <span>↗</span></button>
           </div>
           <div class="profile">
-            <div class="profile-avatar">AD</div>
+            <div class="profile-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 2)) }}</div>
             <div class="profile-info">
               <b>{{ auth()->user()->name }}</b><small>{{ auth()->user()->role }}</small>
             </div>
@@ -96,12 +98,59 @@
             ><button class="icon-button notification" aria-label="Notifikasi">
               ♧<i></i>
             </button>
-            <div class="top-avatar">AD</div>
+            <div class="top-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 2)) }}</div>
           </div>
         </header>
         <div class="page-wrap">
-          <div class="sync-notice"><b>Data tersimpan:</b> produk, stok, transaksi, arus kas, dan laporan membaca database iStore.</div>
+          <div class="sync-notice"><b>Data tersimpan:</b> produk, stok, transaksi, dan arus kas membaca database iStore.</div>
           <section class="page active-page" id="page-dashboard">
+            @if (!auth()->user()->isOwner())
+              <div class="page-heading">
+                <div>
+                  <div class="eyebrow">AREA OPERASIONAL</div>
+                  <h1>Dashboard karyawan <span class="wave">✳</span></h1>
+                  <p>Kelola transaksi, pantau pembayaran, dan catat aktivitas toko.</p>
+                </div>
+                <div class="heading-actions">
+                  <button class="button button-outline" data-goto="stock"><span>＋</span> Catat stok masuk</button>
+                  <button class="button button-primary" id="quick-sale"><span>＋</span> Buat transaksi</button>
+                </div>
+              </div>
+              <div class="metric-grid">
+                <article class="metric-card">
+                  <div class="metric-head"><span>Transaksi saya hari ini</span><span class="metric-icon violet">↗</span></div>
+                  <div class="metric-value" id="employee-sales-count">0</div>
+                  <div class="metric-foot"><span>Transaksi yang saya catat</span></div>
+                </article>
+                <article class="metric-card">
+                  <div class="metric-head"><span>Menunggu pembayaran</span><span class="metric-icon amber">◷</span></div>
+                  <div class="metric-value" id="employee-pending-count">0</div>
+                  <div class="metric-foot"><span>Perlu ditindaklanjuti</span></div>
+                </article>
+                <article class="metric-card">
+                  <div class="metric-head"><span>Unit terjual hari ini</span><span class="metric-icon blue">▣</span></div>
+                  <div class="metric-value" id="employee-units-sold">0 <small>unit</small></div>
+                  <div class="metric-foot"><span>Penjualan yang sudah lunas</span></div>
+                </article>
+                <article class="metric-card">
+                  <div class="metric-head"><span>Stok tersedia</span><span class="metric-icon green">▤</span></div>
+                  <div class="metric-value" id="employee-stock-count">0 <small>unit</small></div>
+                  <div class="metric-foot"><a href="#products" data-goto="products">Lihat katalog →</a></div>
+                </article>
+              </div>
+              <section class="panel table-panel">
+                <div class="panel-heading table-title">
+                  <div><h2>Transaksi saya terbaru</h2><p>Pantau status pembayaran transaksi yang saya catat.</p></div>
+                  <button class="text-button" data-goto="sales">Lihat semua transaksi <span>→</span></button>
+                </div>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>ID TRANSAKSI</th><th>PRODUK</th><th>WAKTU</th><th>STATUS</th><th>TOTAL</th></tr></thead>
+                    <tbody id="employee-recent-sales"></tbody>
+                  </table>
+                </div>
+              </section>
+            @else
             <div class="page-heading">
               <div>
                 <div class="eyebrow">SELAMAT DATANG KEMBALI</div>
@@ -338,6 +387,7 @@
                 </table>
               </div>
             </section>
+            @endif
           </section>
           <section class="page" id="page-products">
             <div class="page-heading">
@@ -624,6 +674,7 @@
               </div>
             </div>
           </section>
+          @if (auth()->user()->isOwner())
           <section class="page" id="page-reports">
             <div class="page-heading">
               <div>
@@ -710,6 +761,8 @@
               </div>
             </div>
           </section>
+          @endif
+          @if (auth()->user()->isOwner())
           <section class="page" id="page-team">
             <div class="page-heading">
               <div>
@@ -725,7 +778,7 @@
               <div class="panel-heading table-title">
                 <div>
                   <h2>Tim iStore</h2>
-                  <p>3 pengguna terdaftar</p>
+                  <p id="employee-count">Memuat data karyawan...</p>
                 </div>
               </div>
               <div class="table-scroll">
@@ -736,57 +789,11 @@
                       <th>EMAIL</th>
                       <th>PERAN</th>
                       <th>STATUS</th>
-                      <th>AKTIVITAS TERAKHIR</th>
+                      <th>DIBUAT · AKTIVITAS</th>
                       <th></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <div class="product-cell">
-                          <div class="profile-avatar">AD</div>
-                          <div><b>Aditya Pratama</b><small>Owner</small></div>
-                        </div>
-                      </td>
-                      <td>aditya@istore.demo</td>
-                      <td><span class="role-pill owner-role">Owner</span></td>
-                      <td>
-                        <span class="status-pill status-paid">Aktif</span>
-                      </td>
-                      <td>Hari ini, 09.12</td>
-                      <td>•••</td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="product-cell">
-                          <div class="profile-avatar employee-avatar">NR</div>
-                          <div><b>Nadia Rahma</b><small>Karyawan</small></div>
-                        </div>
-                      </td>
-                      <td>nadia@istore.demo</td>
-                      <td><span class="role-pill">Karyawan</span></td>
-                      <td>
-                        <span class="status-pill status-paid">Aktif</span>
-                      </td>
-                      <td>Hari ini, 09.35</td>
-                      <td>•••</td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="product-cell">
-                          <div class="profile-avatar employee-avatar">FA</div>
-                          <div><b>Fajar Akbar</b><small>Karyawan</small></div>
-                        </div>
-                      </td>
-                      <td>fajar@istore.demo</td>
-                      <td><span class="role-pill">Karyawan</span></td>
-                      <td>
-                        <span class="status-pill status-paid">Aktif</span>
-                      </td>
-                      <td>Kemarin, 18.20</td>
-                      <td>•••</td>
-                    </tr>
-                  </tbody>
+                  <tbody id="employees-table"></tbody>
                 </table>
               </div>
             </div>
@@ -802,6 +809,8 @@
               </div>
             </div>
           </section>
+          @endif
+          @if (auth()->user()->isOwner())
           <section class="page" id="page-settings">
             <div class="page-heading">
               <div>
@@ -867,6 +876,7 @@
               </div>
             </div>
           </section>
+          @endif
         </div>
       </main>
     </div>
@@ -907,7 +917,7 @@
         </form>
       </div>
     </div>
-    <script src="/istore/app.js?v=20261010-1"></script>
+    <script src="/istore/app.js?v=20261010-2"></script>
   </body>
 </html>
 
